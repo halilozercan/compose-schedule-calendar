@@ -5,10 +5,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.foundation.layout.*
-import androidx.compose.material.*
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.Scaffold
+import androidx.compose.material.Surface
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.HideImage
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material.icons.filled.ZoomOut
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -31,10 +38,9 @@ class MainActivity : ComponentActivity() {
   }
 }
 
-@OptIn(ExperimentalAnimationApi::class)
 @Composable
 fun ScheduleCalendarDemo() {
-  val viewSpan = remember { mutableStateOf(48 * 3600) }
+  val viewSpan = remember { mutableStateOf(48 * 3600L) }
   val eventTimesVisible = remember { mutableStateOf(true) }
   Column(modifier = Modifier.fillMaxHeight()) {
     Row {

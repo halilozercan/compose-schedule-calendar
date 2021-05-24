@@ -30,22 +30,17 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.halilibo.schedulecalendar.ui.theme.G500
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import org.threeten.bp.LocalDateTime
 import org.threeten.bp.format.DateTimeFormatter
 import org.threeten.bp.temporal.ChronoUnit
 import java.util.*
-import kotlin.math.abs
-import kotlin.math.roundToLong
 
 
-@ExperimentalAnimationApi
 @Composable
 fun ScheduleCalendar(
     state: ScheduleCalendarState,
     modifier: Modifier = Modifier,
-    viewSpan: Int = 48 * 3600, // in seconds
+    viewSpan: Long = 48 * 3600L, // in seconds
     sections: List<CalendarSection> = emptyList(),
     now: LocalDateTime = LocalDateTime.now(),
     eventTimesVisible: Boolean = true
@@ -61,69 +56,14 @@ fun ScheduleCalendar(
     state.updateView(viewSpan, constraints.maxWidth)
 
     Column {
-        // Days
-        BoxWithConstraints(
+        DaysRow(
+            state = state,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(vertical = 8.dp)
-        ) {
-            (state.startDateTime daysBetween state.endDateTime).forEach { localDateTime ->
-                val (width, offsetX) = state.widthAndOffsetForEvent(
-                    start = localDateTime,
-                    end = localDateTime.plusDays(1),
-                    totalWidth = constraints.maxWidth
-                )
-                Column(modifier = Modifier
-                    .width(with(LocalDensity.current) { width.toDp() })
-                    .offset { IntOffset(offsetX, 0) }
-                    .padding(horizontal = 8.dp)
-                ) {
-                    Text(
-                        text = localDateTime.format(DateTimeFormatter.ofPattern("MMM, dd")),
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        overflow = TextOverflow.Clip,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
+        )
 
-        // hours row if necessary
-        AnimatedVisibility(
-            visible = state.visibleHours.isNotEmpty()
-        ) {
-            Layout(
-                content = {
-                    state.visibleHours.forEach { localDateTime ->
-                        Text(
-                            localDateTime.format(DateTimeFormatter.ofPattern("hh a")),
-                            fontSize = 12.sp,
-                            modifier = Modifier.then(
-                                LocalDateTimeData(localDateTime)
-                            )
-                        )
-                    }
-                }
-            ) { measurables, constraints ->
-                val placeables = measurables.map { it.measure(constraints) to it.localDateTime }
-
-                val height = if (placeables.isNotEmpty()) {
-                    placeables.maxOf { it.first.height }
-                } else {
-                    0
-                }
-                layout(constraints.maxWidth, height) {
-                    placeables.forEach { (placeable, localDateTime) ->
-                        val origin =
-                            (ChronoUnit.SECONDS.between(state.startDateTime, localDateTime)) / state.secondsInPx
-                        val x = origin.toInt() - placeable.width / 2
-                        placeable.placeRelative(x.coerceAtLeast(0), 0)
-                    }
-                }
-            }
-        }
+        HoursRow(state)
 
         Box(modifier = Modifier.fillMaxWidth()) {
             Column {
@@ -139,8 +79,7 @@ fun ScheduleCalendar(
             // hour dividers
             Canvas(modifier = Modifier.matchParentSize()) {
                 state.visibleHours.forEach { localDateTime ->
-                    val offsetPercent =
-                        state.offsetFraction(localDateTime)
+                    val offsetPercent = state.offsetFraction(localDateTime)
                     drawLine(
                         color = Color.Gray,
                         strokeWidth = 2f,
@@ -155,26 +94,15 @@ fun ScheduleCalendar(
             }
         }
     }
-    // day dividers
+
+    DayDividers(
+        state = state,
+        modifier = Modifier.matchParentSize()
+    )
+
+    // "now" indicator
     Canvas(modifier = Modifier.matchParentSize()) {
-        (state.startDateTime daysBetween state.endDateTime).forEach { localDateTime ->
-            val offsetPercent = state.offsetFraction(localDateTime)
-            drawLine(
-                color = Color.Gray,
-                strokeWidth = 4f,
-                start = Offset(offsetPercent * size.width, 0f),
-                end = Offset(offsetPercent * size.width, size.height),
-                pathEffect = PathEffect.dashPathEffect(
-                    intervals = floatArrayOf(10f, 20f),
-                    phase = 5f
-                )
-            )
-        }
-    }
-    // right now
-    Canvas(modifier = Modifier.matchParentSize()) {
-        val offsetPercent =
-            state.offsetFraction(now)
+        val offsetPercent = state.offsetFraction(now)
         drawLine(
             color = Color.Magenta,
             strokeWidth = 6f,
@@ -267,6 +195,92 @@ fun CalendarSectionRow(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+internal fun DaysRow(
+    state: ScheduleCalendarState,
+    modifier: Modifier = Modifier
+) {
+    BoxWithConstraints(modifier = modifier) {
+        (state.startDateTime daysBetween state.endDateTime).forEach { localDateTime ->
+            val (width, offsetX) = state.widthAndOffsetForEvent(
+                start = localDateTime,
+                end = localDateTime.plusDays(1),
+                totalWidth = constraints.maxWidth
+            )
+            Column(modifier = Modifier
+                .width(with(LocalDensity.current) { width.toDp() })
+                .offset { IntOffset(offsetX, 0) }
+                .padding(horizontal = 8.dp)
+            ) {
+                Text(
+                    text = localDateTime.format(DateTimeFormatter.ofPattern("MMM, dd")),
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Clip,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+internal fun HoursRow(
+    state: ScheduleCalendarState
+) {
+    AnimatedVisibility(visible = state.visibleHours.isNotEmpty()) {
+        Layout(
+            content = {
+                state.visibleHours.forEach { localDateTime ->
+                    Text(
+                        localDateTime.format(DateTimeFormatter.ofPattern("hh a")),
+                        fontSize = 12.sp,
+                        modifier = Modifier.then(
+                            LocalDateTimeData(localDateTime)
+                        )
+                    )
+                }
+            }
+        ) { measurables, constraints ->
+            val placeables = measurables.map { it.measure(constraints) to it.localDateTime }
+
+            val width = constraints.maxWidth
+            val height = if (placeables.isNotEmpty()) { placeables.maxOf { it.first.height } } else { 0 }
+            layout(width, height) {
+                placeables.forEach { (placeable, localDateTime) ->
+                    val origin = state.offsetFraction(localDateTime) * width
+                    val x = origin.toInt() - placeable.width / 2
+                    placeable.placeRelative(x.coerceAtLeast(0), 0)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun DayDividers(
+    state: ScheduleCalendarState,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        (state.startDateTime daysBetween state.endDateTime).forEach { localDateTime ->
+            val offsetPercent = state.offsetFraction(localDateTime)
+            drawLine(
+                color = Color.Gray,
+                strokeWidth = 4f,
+                start = Offset(offsetPercent * size.width, 0f),
+                end = Offset(offsetPercent * size.width, size.height),
+                pathEffect = PathEffect.dashPathEffect(
+                    intervals = floatArrayOf(10f, 20f),
+                    phase = 5f
+                )
+            )
         }
     }
 }
